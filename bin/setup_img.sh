@@ -128,6 +128,7 @@ function checkBool()  {
 # helper of main()
 function CheckOptions() {
   checkBool "defaultuseflags"
+  checkBool "guru"
   checkBool "libressl"
   checkBool "multiabi"
   checkBool "musl"
@@ -157,6 +158,7 @@ function CheckOptions() {
 function CreateImageName()  {
   # profile[-flavour]-day-time
   name="$(echo $profile | tr '/' '_')-"
+  [[ "$guru" = "y" ]]         && name="${name}_guru"  || true
   [[ "$libressl" = "y" ]]     && name="${name}_libressl"  || true
   [[ "$multiabi" = "y" ]]     && name="${name}_abi32+64"  || true
   [[ "$science" = "y" ]]      && name="${name}_science"   || true
@@ -276,9 +278,10 @@ EOF
   echo 'local'            > ./$repodir/local/profiles/repo_name
 
   addRepoConf "gentoo" "10"
-  [[ "$libressl" = "y" ]] && addRepoConf "libressl" "20"  || true
-  [[ "$musl" = "y" ]]     && addRepoConf "musl"     "30"  || true
-  [[ "$science" = "y" ]]  && addRepoConf "science"  "40"  || true
+  [[ "$guru" = "y" ]]     && addRepoConf "guru"     "20"  || true
+  [[ "$libressl" = "y" ]] && addRepoConf "libressl" "30"  || true
+  [[ "$musl" = "y" ]]     && addRepoConf "musl"     "40"  || true
+  [[ "$science" = "y" ]]  && addRepoConf "science"  "50"  || true
   addRepoConf "tinderbox" "90" "/mnt/tb/data/portage"
   addRepoConf "local" "99"
 }
@@ -540,6 +543,7 @@ date
 echo "#setup rsync" | tee /var/tmp/tb/task
 
                          rsync --archive --cvs-exclude /mnt/repos/gentoo   $repodir/
+[[ $guru = "y" ]]     && rsync --archive --cvs-exclude /mnt/repos/guru     $repodir/
 [[ $libressl = "y" ]] && rsync --archive --cvs-exclude /mnt/repos/libressl $repodir/  || true
 [[ $musl = "y" ]]     && rsync --archive --cvs-exclude /mnt/repos/musl     $repodir/  || true
 [[ $science = "y" ]]  && rsync --archive --cvs-exclude /mnt/repos/science  $repodir/  || true
@@ -598,7 +602,11 @@ fi
 date
 echo "#setup backlog" | tee /var/tmp/tb/task
 # sort -u is needed if the same package is in 2 or more repos
-qsearch --all --nocolor --name-only --quiet | sort -u | shuf > /var/tmp/tb/backlog
+if [[ $guru = "y" ]]; then
+  qlist -tR | grep ::guru | sed 's/::guru//' | sort | uniq | shuf >> /var/tmp/tb/backlog
+else
+  qsearch --all --nocolor --name-only --quiet | sort -u | shuf >> /var/tmp/tb/backlog
+fi
 touch /var/tmp/tb/task
 
 # the very last step:
@@ -734,7 +742,7 @@ gentoo_mirrors=$(grep "^GENTOO_MIRRORS=" /etc/portage/make.conf | cut -f2 -d'"' 
 autostart="y"
 SetOptions
 
-while getopts a:c:d:l:m:p:r:s:t: opt
+while getopts a:c:d:g:l:m:p:r:s:t: opt
 do
   case $opt in
     a)  autostart="$OPTARG"         ;;
@@ -743,6 +751,7 @@ do
         DryRunWithVaryingUseFlags
         exit 0
         ;;
+    g)  guru="$OPTARG"              ;;
     l)  libressl="$OPTARG"          ;;
     m)  multiabi="$OPTARG"          ;;
     p)  profile="$OPTARG"           ;;
